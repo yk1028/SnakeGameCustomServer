@@ -138,8 +138,8 @@ let tServer = net.createServer(function(client) {
 
                 break;
             case 3:
-                //game over
-                console.log("type 3 (water collision)");
+                //game end
+                console.log("type 3 (game end)");
 
                 var res  = (win) => { 
                     return {
@@ -152,15 +152,15 @@ let tServer = net.createServer(function(client) {
 
                 console.log();
                 console.log("Send to client" + clientId);
-                console.log(res(false));
+                console.log(res(message.win));
 
-                clients[clientId].client.write(JSON.stringify(res(false)));
+                clients[clientId].client.write(JSON.stringify(res(message.win)));
 
                 console.log();
                 console.log("Send to client" + (1 - clientId));
-                console.log(res(true));
+                console.log(res(!message.win));
 
-                clients[1 - clientId].client.write(JSON.stringify(res(true)));
+                clients[1 - clientId].client.write(JSON.stringify(res(!message.win)));
                 
                 break;
             default:

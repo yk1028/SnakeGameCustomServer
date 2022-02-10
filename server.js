@@ -6,17 +6,20 @@ let sendStartMessage = (client, clientId, canStart) => {
         message: {
             type: 0,
             clientId: clientId,
-            start: canStart
+            start: canStart,
+            apple: apple
         }
     };
 
+    console.log();
+    console.log("Send to client" + clientId);
     console.log(res);
 
     client.write(JSON.stringify(res));
 }
 
 let generateRandom = (bound) => {
-    return Math.floor(Math.random() * bound * 2 + 1) - bound;
+    return Math.floor(Math.random() * bound * 2.0 + 1.0) - bound;
 }
 
 let apple = {
@@ -52,6 +55,8 @@ let tServer = net.createServer(function(client) {
     client.setEncoding('utf8');
     
     client.on('data', function(data) {
+        console.log();
+        console.log("Receive from client" + clientId);
         console.log(data);
 
         let message = JSON.parse(data);
@@ -59,7 +64,7 @@ let tServer = net.createServer(function(client) {
         switch (message.type) {
             case 0:
                 //start
-                console.log("type 0");
+                console.log("type 0 (start)");
                 var canStart = clients.length == 2;
 
                 if (canStart) {
@@ -78,7 +83,7 @@ let tServer = net.createServer(function(client) {
                 break;
             case 1:
                 //snake position, direction 전달
-                console.log("type 1");
+                console.log("type 1 (snake position, direction)");
 
                 var res = {
                     message: {
@@ -87,14 +92,16 @@ let tServer = net.createServer(function(client) {
                     }
                 };
             
+                console.log();
+                console.log("Send to client" + (1 - clientId));
                 console.log(res);
             
                 clients[1 - clientId].client.write(JSON.stringify(res));
 
                 break;
             case 2:
-                //collision apple
-                console.log("type 2");
+                //apple collision 
+                console.log("type 2 (apple collision)");
 
                 if (apple.posX == message.apple.posX 
                     && apple.posY == message.apple.posY) {
@@ -104,36 +111,57 @@ let tServer = net.createServer(function(client) {
                     break;
                 }
 
-                var res = {
-                    message: {
-                        type: 2,
-                        apple: {
-                            posX : apple.posX,
-                            posY : apple.posY
-                        },
-                        isMine : true
+                var res  = (isMine) => { 
+                    return {
+                        message: {
+                            type: 2,
+                            apple: {
+                                posX : apple.posX,
+                                posY : apple.posY
+                            },
+                            isMine : isMine
+                        }
                     }
                 };
             
-                console.log(res);
+                console.log();
+                console.log("Send to client" + clientId);
+                console.log(res(true));
             
-                clients[clientId].client.write(JSON.stringify(res));
+                clients[clientId].client.write(JSON.stringify(res(true)));
+            
+                console.log();
+                console.log("Send to client" + (1 - clientId));
+                console.log(res(false));
+            
+                clients[1 - clientId].client.write(JSON.stringify(res(false)));
 
-                var resOther = {
-                    message: {
-                        type: 2,
-                        apple: {
-                            posX : apple.posX,
-                            posY : apple.posY
-                        },
-                        isMine : false
+                break;
+            case 3:
+                //game over
+                console.log("type 3 (water collision)");
+
+                var res  = (win) => { 
+                    return {
+                        message: {
+                            type: 3,
+                            win : win
+                        }
                     }
                 };
-            
-                console.log(resOther);
-            
-                clients[1 - clientId].client.write(JSON.stringify(resOther));
 
+                console.log();
+                console.log("Send to client" + clientId);
+                console.log(res(false));
+
+                clients[clientId].client.write(JSON.stringify(res(false)));
+
+                console.log();
+                console.log("Send to client" + (1 - clientId));
+                console.log(res(true));
+
+                clients[1 - clientId].client.write(JSON.stringify(res(true)));
+                
                 break;
             default:
                 console.log("invalid message type");

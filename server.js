@@ -1,6 +1,13 @@
 //TCP
 const net = require('net');
 
+let apple = {
+    posX : 0,
+    posY : 0
+};
+
+let clients = [];
+
 let sendStartMessage = (client, clientId, canStart) => {
     var res = {
         message: {
@@ -18,16 +25,24 @@ let sendStartMessage = (client, clientId, canStart) => {
     client.write(JSON.stringify(res));
 }
 
+let sendToBoth = (clientId, res, resOther) => {
+    console.log();
+    console.log("Send to client" + clientId);
+    console.log(res);
+
+    clients[clientId].client.write(JSON.stringify(res));
+
+    console.log();
+    console.log("Send to client" + (1 - clientId));
+    console.log(resOther);
+
+    clients[1 - clientId].client.write(JSON.stringify(resOther));
+}
+
 let generateRandom = (bound) => {
     return Math.floor(Math.random() * bound * 2.0 + 1.0) - bound;
 }
 
-let apple = {
-    posX : 0,
-    posY : 0
-};
-
-let clients = [];
 let tServer = net.createServer(function(client) {
     console.log("connection : "+client.remotePort);
 
@@ -76,13 +91,13 @@ let tServer = net.createServer(function(client) {
 
                 sendStartMessage(clients[clientId].client, clientId, canStart);
 
-                if (clientId != 0){
+                if (clients.length == 2){
                     sendStartMessage(clients[1 - clientId].client, 1 - clientId, canStart);
                 }
 
                 break;
             case 1:
-                //snake position, direction 전달
+                //snake position, direction
                 console.log("type 1 (snake position, direction)");
 
                 var res = {
@@ -123,18 +138,8 @@ let tServer = net.createServer(function(client) {
                         }
                     }
                 };
-            
-                console.log();
-                console.log("Send to client" + clientId);
-                console.log(res(true));
-            
-                clients[clientId].client.write(JSON.stringify(res(true)));
-            
-                console.log();
-                console.log("Send to client" + (1 - clientId));
-                console.log(res(false));
-            
-                clients[1 - clientId].client.write(JSON.stringify(res(false)));
+
+                sendToBoth(clientId, res(true), res(false));
 
                 break;
             case 3:
@@ -150,17 +155,7 @@ let tServer = net.createServer(function(client) {
                     }
                 };
 
-                console.log();
-                console.log("Send to client" + clientId);
-                console.log(res(message.win));
-
-                clients[clientId].client.write(JSON.stringify(res(message.win)));
-
-                console.log();
-                console.log("Send to client" + (1 - clientId));
-                console.log(res(!message.win));
-
-                clients[1 - clientId].client.write(JSON.stringify(res(!message.win)));
+                sendToBoth(clientId, res(message.win), res(!message.win))
                 
                 break;
             default:

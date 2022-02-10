@@ -1,7 +1,29 @@
 //TCP
 const net = require('net');
 
-//클라이언트 저장할 배열
+let sendStartMessage = (client, clientId, canStart) => {
+    var res = {
+        message: {
+            type: 0,
+            clientId: clientId,
+            start: canStart
+        }
+    };
+
+    console.log(res);
+
+    client.write(JSON.stringify(res));
+}
+
+let generateRandom = (bound) => {
+    return Math.floor(Math.random() * bound * 2 + 1) - bound;
+}
+
+let apple = {
+    posX : 0,
+    posY : 0
+};
+
 let clients = [];
 let tServer = net.createServer(function(client) {
     console.log("connection : "+client.remotePort);
@@ -18,7 +40,6 @@ let tServer = net.createServer(function(client) {
     
     let clientId = clients.length;
 
-    //클라이언트 정보 저장
     clients.push(
         {
             name : client.remotePort,
@@ -27,18 +48,101 @@ let tServer = net.createServer(function(client) {
     );
     
     console.log("connection clients list : "+ clients);
+
+    client.setEncoding('utf8');
     
     client.on('data', function(data) {
-		//데이터를 발신한 소켓 클라이언트에게 메시지 발신
-        if (clients.length > 1) {
-            let idx = 1- clientId;
-            clients[idx].client.write(data);
+        console.log(data);
+
+        let message = JSON.parse(data);
+
+        switch (message.type) {
+            case 0:
+                //start
+                console.log("type 0");
+                var canStart = clients.length == 2;
+
+                if (canStart) {
+                    apple = {
+                        posX : 0,
+                        posY : 0
+                    };
+                }
+
+                sendStartMessage(clients[clientId].client, clientId, canStart);
+
+                if (clientId != 0){
+                    sendStartMessage(clients[1 - clientId].client, 1 - clientId, canStart);
+                }
+
+                break;
+            case 1:
+                //snake position, direction 전달
+                console.log("type 1");
+
+                var res = {
+                    message: {
+                        type: 1,
+                        snake: message.snake
+                    }
+                };
+            
+                console.log(res);
+            
+                clients[1 - clientId].client.write(JSON.stringify(res));
+
+                break;
+            case 2:
+                //collision apple
+                console.log("type 2");
+
+                if (apple.posX == message.apple.posX 
+                    && apple.posY == message.apple.posY) {
+                        apple.posX = generateRandom(16);
+                        apple.posY = generateRandom(7);
+                } else {
+                    break;
+                }
+
+                var res = {
+                    message: {
+                        type: 2,
+                        apple: {
+                            posX : apple.posX,
+                            posY : apple.posY
+                        },
+                        isMine : true
+                    }
+                };
+            
+                console.log(res);
+            
+                clients[clientId].client.write(JSON.stringify(res));
+
+                var resOther = {
+                    message: {
+                        type: 2,
+                        apple: {
+                            posX : apple.posX,
+                            posY : apple.posY
+                        },
+                        isMine : false
+                    }
+                };
+            
+                console.log(resOther);
+            
+                clients[1 - clientId].client.write(JSON.stringify(resOther));
+
+                break;
+            default:
+                console.log("invalid message type");
         }
     });
 
     
     client.on('end', function() {
-    	//클라이언트 소켓이 커넥션을 끊었을때 
+
         console.log("end connection : "+client.remotePort);
         console.log(client.remoteAddress + ' Client disconnected');
         let idx = clients.indexOf(clients.name);

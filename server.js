@@ -7,6 +7,7 @@ let apple = {
 };
 
 let clients = [];
+let gameActive = false;
 
 let sendStartMessage = (client, clientId, canStart) => {
     var res = {
@@ -87,6 +88,8 @@ let tServer = net.createServer(function(client) {
                         posX : 0,
                         posY : 0
                     };
+
+                    gameActive = true;
                 }
 
                 sendStartMessage(clients[clientId].client, clientId, canStart);
@@ -145,6 +148,10 @@ let tServer = net.createServer(function(client) {
             case 3:
                 //game end
                 console.log("type 3 (game end)");
+
+                if (!gameActive) {
+                    return;
+                }
 
                 var res  = (win) => { 
                     return {

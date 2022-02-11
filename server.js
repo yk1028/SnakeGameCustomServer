@@ -1,5 +1,8 @@
 //TCP
 const net = require('net');
+const db = require('./db')();
+const connection = db.init();
+db.db_open(connection);
 
 let apple = {
     posX : 0,
@@ -8,6 +11,7 @@ let apple = {
 
 let clients = [];
 let gameActive = false;
+let readyPlayer = 0;
 
 let sendStartMessage = (client, clientId, canStart) => {
     var res = {
@@ -19,11 +23,15 @@ let sendStartMessage = (client, clientId, canStart) => {
         }
     };
 
+    sendTo(clientId, res);
+}
+
+let sendTo = (clientId, res) => {
     console.log();
     console.log("Send to client" + clientId);
     console.log(res);
 
-    client.write(JSON.stringify(res));
+    clients[clientId].client.write(JSON.stringify(res));
 }
 
 let sendToBoth = (clientId, res, resOther) => {
@@ -52,6 +60,11 @@ let tServer = net.createServer(function(client) {
         return;
     }
 
+    if (gameActive) {
+        console.log('game is active');
+        return;
+    }
+
     console.log('Client connection');
     console.log('   local = '+ client.localAddress +':'+ client.localPort);
     console.log('   remote ='+ client.remoteAddress+':'+ client.remotePort);
@@ -62,7 +75,8 @@ let tServer = net.createServer(function(client) {
     clients.push(
         {
             name : client.remotePort,
-            client : client
+            client : client,
+            ready : false
         }
     );
     
@@ -81,7 +95,11 @@ let tServer = net.createServer(function(client) {
             case 0:
                 //start
                 console.log("type 0 (start)");
-                var canStart = clients.length == 2;
+                readyPlayer++;
+                clients[clientId].ready = true;
+                var canStart = readyPlayer == 2;
+
+                sendStartMessage(clients[clientId].client, clientId, canStart);
 
                 if (canStart) {
                     apple = {
@@ -90,14 +108,11 @@ let tServer = net.createServer(function(client) {
                     };
 
                     gameActive = true;
+
+                    if (clients.length == 2){
+                        sendStartMessage(clients[1 - clientId].client, 1 - clientId, canStart);
+                    }
                 }
-
-                sendStartMessage(clients[clientId].client, clientId, canStart);
-
-                if (clients.length == 2){
-                    sendStartMessage(clients[1 - clientId].client, 1 - clientId, canStart);
-                }
-
                 break;
             case 1:
                 //snake position, direction
@@ -165,6 +180,25 @@ let tServer = net.createServer(function(client) {
                 sendToBoth(clientId, res(message.win), res(!message.win))
                 
                 break;
+            case 5:
+                //create user
+                console.log("type 5 (create user)");
+
+                db.insert_user(connection, message.username);
+                db.select_all_user(connection);
+
+                var res  = (isSuccess) => { 
+                    return {
+                        message: {
+                            type: 5,
+                            isSuccess : isSuccess
+                        }
+                    }
+                };
+
+                sendTo(clientId, res(true))
+                
+                break;
             default:
                 console.log("invalid message type");
         }
@@ -178,6 +212,11 @@ let tServer = net.createServer(function(client) {
         let idx = clients.indexOf(clients.name);
         clients.splice(idx,1);
         console.log(clients);
+
+        if(clients.length == 0) {
+            readyPlayer = 0;
+            gameActive = false;
+        }
     });
     
     client.on('error', function(err) {

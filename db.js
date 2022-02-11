@@ -21,18 +21,31 @@ module.exports = function () {
         })
       },
 
-      insert_user: function (con, username) {
+      insert_user: function (con, username, callback) {
         con.query('INSERT INTO users(username) VALUES("' + username + '")', 
             function (error, results, fields){
+
                 if (error){
-                    console.log(error);
+                    console.log("error : ");
+                    console.log("   " + error);
+                    callback(err, null);
+                } else {
+                    con.query('SELECT id FROM users WHERE users.username = "' + username + '"', 
+                    function (error, id_results, fields){
+                        if (error){
+                            console.log("error : ");
+                            console.log("   " + error);
+                            callback(err, null);
+                        } else {
+                            callback(null, id_results);
+                        }
+                    });
                 }
-                console.log(results);
             });
       },
       
-      insert_record: function (con, username, win) {
-        con.query('INSERT INTO records(username, win) VALUES("' + username + '", ' + win + ')', 
+      insert_record: function (con, userId, win) {
+        con.query('INSERT INTO records(user_id, win) VALUES(' + userId + ', ' + win + ')', 
             function (error, results, fields){
                 if (error){
                     console.log(error);
@@ -56,12 +69,8 @@ module.exports = function () {
         con.query('SELECT * FROM users WHERE users.username = "' + username + '"', 
             function (error, results, fields){
                 if (error){
-                    console.log("error : ");
-                    console.log("   " + error);
                     callback(err, null);
                 } else {
-                    console.log("data : ");
-                    console.log("   " + results);
                     callback(null, results);
                 }
             });

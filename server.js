@@ -12,6 +12,7 @@ let apple = {
 let clients = [];
 let gameActive = false;
 let readyPlayer = 0;
+let readyPlayerId = {};
 
 let sendStartMessage = (client, clientId, canStart) => {
     var res = {
@@ -75,8 +76,7 @@ let tServer = net.createServer(function(client) {
     clients.push(
         {
             name : client.remotePort,
-            client : client,
-            ready : false
+            client : client
         }
     );
     
@@ -178,13 +178,17 @@ let tServer = net.createServer(function(client) {
                 };
 
                 sendToBoth(clientId, res(message.win), res(!message.win));
+
+
+                db.insert_record(connection, readyPlayerId[clientId], message.win);
+                db.insert_record(connection, readyPlayerId[1 - clientId], !message.win);
                 
                 break;
             case 4:
                 //find user
                 console.log("type 4 (find user)");
 
-                var res  = (isExist) => { 
+                var res  = (isExist, userId) => { 
                     return {
                         message: {
                             type: 4,
@@ -193,7 +197,7 @@ let tServer = net.createServer(function(client) {
                     }
                 };
 
-                var err  = (err) => { 
+                var error  = (err) => { 
                     return {
                         message: {
                             type: 6,
@@ -205,14 +209,15 @@ let tServer = net.createServer(function(client) {
                 db.select_user(connection, message.username, 
                     (err, data) => {
                         if (err != null) {
-                            sendTo(clientId, err(err));
-                            break;
+                            sendTo(clientId, error(err));
+                            return;
                         }
 
                         if (data.length == 0){
-                            sendTo(clientId, res(false));
+                            sendTo(clientId, res(false, null));
                         } else {
                             sendTo(clientId, res(true));
+                            readyPlayerId[clientId] = data[0].id;
                         }
                     });
                 break;
@@ -220,19 +225,24 @@ let tServer = net.createServer(function(client) {
                 //create user
                 console.log("type 5 (create user)");
 
-                db.insert_user(connection, message.username);
-                db.select_all_user(connection);
-
-                var res  = (isSuccess) => { 
-                    return {
-                        message: {
-                            type: 5,
-                            isSuccess : isSuccess
-                        }
+                db.insert_user(connection, message.username, (err, data) => {
+                    if (err != null) {
+                        sendTo(clientId, err(err));
+                        return;
                     }
-                };
 
-                sendTo(clientId, res(true))
+                    var res  = (isSuccess) => { 
+                        return {
+                            message: {
+                                type: 5,
+                                isSuccess : isSuccess
+                            }
+                        }
+                    };
+    
+                    sendTo(clientId, res(true));
+                    readyPlayerId[clientId] = data[0].id;
+                });
                 
                 break;
             default:

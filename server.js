@@ -96,7 +96,6 @@ let tServer = net.createServer(function(client) {
                 //start
                 console.log("type 0 (start)");
                 readyPlayer++;
-                clients[clientId].ready = true;
                 var canStart = readyPlayer == 2;
 
                 sendStartMessage(clients[clientId].client, clientId, canStart);
@@ -138,27 +137,24 @@ let tServer = net.createServer(function(client) {
 
                 if (apple.posX == message.apple.posX 
                     && apple.posY == message.apple.posY) {
-                        apple.posX = generateRandom(16);
-                        apple.posY = generateRandom(7);
-                } else {
-                    break;
-                }
+                    apple.posX = generateRandom(16);
+                    apple.posY = generateRandom(7);
 
-                var res  = (isMine) => { 
-                    return {
-                        message: {
-                            type: 2,
-                            apple: {
-                                posX : apple.posX,
-                                posY : apple.posY
-                            },
-                            isMine : isMine
+                    var res  = (isMine) => { 
+                        return {
+                            message: {
+                                type: 2,
+                                apple: {
+                                    posX : apple.posX,
+                                    posY : apple.posY
+                                },
+                                isMine : isMine
+                            }
                         }
-                    }
-                };
-
-                sendToBoth(clientId, res(true), res(false));
-
+                    };
+    
+                    sendToBoth(clientId, res(true), res(false));
+                }
                 break;
             case 3:
                 //game end

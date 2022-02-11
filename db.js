@@ -74,6 +74,17 @@ module.exports = function () {
                     callback(null, results);
                 }
             });
+      },
+
+      select_record: function (con, userId, callback) {
+        con.query('SELECT * FROM records WHERE records.user_id = ' + userId + ' order by id desc limit 5', 
+            function (error, results, fields){
+                if (error){
+                    callback(err, null);
+                } else {
+                    callback(null, results);
+                }
+            });
       }
     }
   };

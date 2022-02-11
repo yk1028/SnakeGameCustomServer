@@ -179,7 +179,6 @@ let tServer = net.createServer(function(client) {
 
                 sendToBoth(clientId, res(message.win), res(!message.win));
 
-
                 db.insert_record(connection, readyPlayerId[clientId], message.win);
                 db.insert_record(connection, readyPlayerId[1 - clientId], !message.win);
                 
@@ -242,6 +241,29 @@ let tServer = net.createServer(function(client) {
     
                     sendTo(clientId, res(true));
                     readyPlayerId[clientId] = data[0].id;
+                });
+                
+                break;
+            case 6:
+                //find records
+                console.log("type 6 (find records)");
+
+                db.select_record(connection, readyPlayerId[clientId], (err, data) => {
+                    if (err != null) {
+                        sendTo(clientId, err(err));
+                        return;
+                    }
+
+                    var res  = (records) => { 
+                        return {
+                            message: {
+                                type: 6,
+                                records : records
+                            }
+                        }
+                    };
+    
+                    sendTo(clientId, res(data));
                 });
                 
                 break;

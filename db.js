@@ -50,6 +50,21 @@ module.exports = function () {
                 }
                 console.log(results);
             });
+      },
+
+      select_user: function (con, username, callback) {
+        con.query('SELECT * FROM users WHERE users.username = "' + username + '"', 
+            function (error, results, fields){
+                if (error){
+                    console.log("error : ");
+                    console.log("   " + error);
+                    callback(err, null);
+                } else {
+                    console.log("data : ");
+                    console.log("   " + results);
+                    callback(null, results);
+                }
+            });
       }
     }
   };

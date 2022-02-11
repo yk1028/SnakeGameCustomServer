@@ -177,8 +177,44 @@ let tServer = net.createServer(function(client) {
                     }
                 };
 
-                sendToBoth(clientId, res(message.win), res(!message.win))
+                sendToBoth(clientId, res(message.win), res(!message.win));
                 
+                break;
+            case 4:
+                //find user
+                console.log("type 4 (find user)");
+
+                var res  = (isExist) => { 
+                    return {
+                        message: {
+                            type: 4,
+                            isExist : isExist
+                        }
+                    }
+                };
+
+                var err  = (err) => { 
+                    return {
+                        message: {
+                            type: 6,
+                            error : err
+                        }
+                    }
+                };
+
+                db.select_user(connection, message.username, 
+                    (err, data) => {
+                        if (err != null) {
+                            sendTo(clientId, err(err));
+                            break;
+                        }
+
+                        if (data.length == 0){
+                            sendTo(clientId, res(false));
+                        } else {
+                            sendTo(clientId, res(true));
+                        }
+                    });
                 break;
             case 5:
                 //create user

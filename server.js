@@ -11,10 +11,11 @@ let apple = {
 
 let clients = [];
 let gameActive = false;
-let readyPlayer = 0;
-let readyPlayerId = {};
+let readyPlayerCount = 0;
+let readyPlayers = [];
+let readyPlayerIds = {};
 
-let sendStartMessage = (client, clientId, canStart) => {
+let sendStartMessage = (clientId, canStart) => {
     var res = {
         message: {
             type: 0,
@@ -32,7 +33,7 @@ let sendTo = (clientId, res) => {
     console.log("Send to client" + clientId);
     console.log(res);
 
-    clients[clientId].client.write(JSON.stringify(res));
+    readyPlayers[clientId].client.write(JSON.stringify(res));
 }
 
 let sendToBoth = (clientId, res, resOther) => {
@@ -40,13 +41,13 @@ let sendToBoth = (clientId, res, resOther) => {
     console.log("Send to client" + clientId);
     console.log(res);
 
-    clients[clientId].client.write(JSON.stringify(res));
+    readyPlayers[clientId].client.write(JSON.stringify(res));
 
     console.log();
     console.log("Send to client" + (1 - clientId));
     console.log(resOther);
 
-    clients[1 - clientId].client.write(JSON.stringify(resOther));
+    readyPlayers[1 - clientId].client.write(JSON.stringify(resOther));
 }
 
 let generateRandom = (bound) => {
@@ -56,8 +57,9 @@ let generateRandom = (bound) => {
 let tServer = net.createServer(function(client) {
     console.log("connection : "+client.remotePort);
 
-    if (clients.length >= 2) {
-        console.log('connection is full(max : 2)');
+    if (readyPlayerCount == 2) {
+        console.log('player is full(max : 2)');
+        client.end();
         return;
     }
 
@@ -72,6 +74,7 @@ let tServer = net.createServer(function(client) {
     console.log('   client ='+ JSON.stringify(client));
     
     let clientId = clients.length;
+    let readyPlayerId = 0;
 
     clients.push(
         {
@@ -85,186 +88,223 @@ let tServer = net.createServer(function(client) {
     client.setEncoding('utf8');
     
     client.on('data', function(data) {
+        if(clients.length == 1) {
+            clientId = 0;
+        }
+
         console.log();
         console.log("Receive from client" + clientId);
         console.log(data);
+        
+        try {
+            let message = JSON.parse(data);
+         
+            switch (message.type) {
+                case 0:
+                    //start
+                    console.log("type 0 (start)");
 
-        let message = JSON.parse(data);
-
-        switch (message.type) {
-            case 0:
-                //start
-                console.log("type 0 (start)");
-                readyPlayer++;
-                var canStart = readyPlayer == 2;
-
-                sendStartMessage(clients[clientId].client, clientId, canStart);
-
-                if (canStart) {
-                    apple = {
-                        posX : 0,
-                        posY : 0
-                    };
-
-                    gameActive = true;
-
-                    if (clients.length == 2){
-                        sendStartMessage(clients[1 - clientId].client, 1 - clientId, canStart);
-                    }
-                }
-                break;
-            case 1:
-                //snake position, direction
-                console.log("type 1 (snake position, direction)");
-
-                var res = {
-                    message: {
-                        type: 1,
-                        snake: message.snake
-                    }
-                };
-            
-                console.log();
-                console.log("Send to client" + (1 - clientId));
-                console.log(res);
-            
-                clients[1 - clientId].client.write(JSON.stringify(res));
-
-                break;
-            case 2:
-                //apple collision 
-                console.log("type 2 (apple collision)");
-
-                if (apple.posX == message.apple.posX 
-                    && apple.posY == message.apple.posY) {
-                    apple.posX = generateRandom(16);
-                    apple.posY = generateRandom(7);
-
-                    var res  = (isMine) => { 
-                        return {
-                            message: {
-                                type: 2,
-                                apple: {
-                                    posX : apple.posX,
-                                    posY : apple.posY
-                                },
-                                isMine : isMine
-                            }
+                    readyPlayers.push(
+                        {
+                            client : client
                         }
-                    };
-    
-                    sendToBoth(clientId, res(true), res(false));
-                }
-                break;
-            case 3:
-                //game end
-                console.log("type 3 (game end)");
+                    );
 
-                if (!gameActive) {
-                    return;
-                }
+                    readyPlayerId = readyPlayerCount;
+                    readyPlayerCount++;
 
-                var res  = (win) => { 
-                    return {
+                    let canStart = readyPlayerCount == 2
+
+                    if (canStart) {
+                        apple = {
+                            posX : 0,
+                            posY : 0
+                        };
+
+                        gameActive = true;
+                        sendStartMessage(1 - readyPlayerId, canStart);
+                    }
+
+                    sendStartMessage(readyPlayerId, canStart);
+
+                    break;
+                case 1:
+                    //snake position, direction
+                    console.log("type 1 (snake position, direction)");
+
+                    var res = {
                         message: {
-                            type: 3,
-                            win : win
+                            type: 1,
+                            snake: message.snake
                         }
-                    }
-                };
-
-                sendToBoth(clientId, res(message.win), res(!message.win));
-
-                db.insert_record(connection, readyPlayerId[clientId], message.win);
-                db.insert_record(connection, readyPlayerId[1 - clientId], !message.win);
+                    };
                 
-                break;
-            case 4:
-                //find user
-                console.log("type 4 (find user)");
+                    console.log();
+                    console.log("Send to client" + (1 - readyPlayerId));
+                    console.log(res);
+                
+                    readyPlayers[1 - readyPlayerId].client.write(JSON.stringify(res));
 
-                var res  = (isExist, userId) => { 
-                    return {
-                        message: {
-                            type: 4,
-                            isExist : isExist
-                        }
+                    break;
+                case 2:
+                    //apple collision 
+                    console.log("type 2 (apple collision)");
+
+                    if (apple.posX == message.apple.posX 
+                        && apple.posY == message.apple.posY) {
+                        apple.posX = generateRandom(16);
+                        apple.posY = generateRandom(7);
+
+                        var res  = (isMine) => { 
+                            return {
+                                message: {
+                                    type: 2,
+                                    apple: {
+                                        posX : apple.posX,
+                                        posY : apple.posY
+                                    },
+                                    isMine : isMine
+                                }
+                            }
+                        };
+        
+                        sendToBoth(readyPlayerId, res(true), res(false));
                     }
-                };
+                    break;
+                case 3:
+                    //game end
+                    console.log("type 3 (game end)");
 
-                var error  = (err) => { 
-                    return {
-                        message: {
-                            type: 6,
-                            error : err
-                        }
-                    }
-                };
-
-                db.select_user(connection, message.username, 
-                    (err, data) => {
-                        if (err != null) {
-                            sendTo(clientId, error(err));
-                            return;
-                        }
-
-                        if (data.length == 0){
-                            sendTo(clientId, res(false, null));
-                        } else {
-                            sendTo(clientId, res(true));
-                            readyPlayerId[clientId] = data[0].id;
-                        }
-                    });
-                break;
-            case 5:
-                //create user
-                console.log("type 5 (create user)");
-
-                db.insert_user(connection, message.username, (err, data) => {
-                    if (err != null) {
-                        sendTo(clientId, err(err));
+                    if (!gameActive) {
                         return;
                     }
 
-                    var res  = (isSuccess) => { 
+                    var res  = (win) => { 
                         return {
                             message: {
-                                type: 5,
-                                isSuccess : isSuccess
+                                type: 3,
+                                win : win
                             }
                         }
                     };
-    
-                    sendTo(clientId, res(true));
-                    readyPlayerId[clientId] = data[0].id;
-                });
-                
-                break;
-            case 6:
-                //find records
-                console.log("type 6 (find records)");
 
-                db.select_record(connection, readyPlayerId[clientId], (err, data) => {
-                    if (err != null) {
-                        sendTo(clientId, err(err));
-                        return;
-                    }
+                    sendToBoth(readyPlayerId, res(message.win), res(!message.win));
 
-                    var res  = (records) => { 
+                    db.insert_record(connection, readyPlayerIds[readyPlayerId], message.win);
+                    db.insert_record(connection, readyPlayerIds[1 - readyPlayerId], !message.win);
+                    
+                    readyPlayerCount = 0;
+                    readyPlayers = [];
+
+                    gameActive = false;
+
+                    break;
+                case 4:
+                    //find user
+                    console.log("type 4 (find user)");
+
+                    var res  = (isExist) => { 
+                        return {
+                            message: {
+                                type: 4,
+                                isExist : isExist
+                            }
+                        }
+                    };
+
+                    var error  = (err) => { 
                         return {
                             message: {
                                 type: 6,
-                                records : records
+                                error : err
                             }
                         }
                     };
-    
-                    sendTo(clientId, res(data));
-                });
-                
-                break;
-            default:
-                console.log("invalid message type");
+
+                    db.select_user(connection, message.username, 
+                        (err, data) => {
+                            if (err != null) {
+                                
+                                console.log();
+                                console.log("Send to client" + clientId);
+                                console.log(res);
+                                client.write(JSON.stringify(err));
+                                return;
+                            }
+
+                            if (data.length == 0){
+                                console.log();
+                                console.log("Send to client" + clientId);
+                                console.log(res);
+                                client.write(JSON.stringify(res(false)));
+                            } else {
+                                console.log();
+                                console.log("Send to client" + clientId);
+                                console.log(res);
+                                client.write(JSON.stringify(res(true)));
+                                readyPlayerIds[readyPlayerId] = data[0].id;
+                            }
+                        });
+                    break;
+                case 5:
+                    //create user
+                    console.log("type 5 (create user)");
+
+                    db.insert_user(connection, message.username, (err, data) => {
+                        if (err != null) {
+                            sendTo(readyPlayerId, err(err));
+                            return;
+                        }
+
+                        var res  = (isSuccess) => { 
+                            return {
+                                message: {
+                                    type: 5,
+                                    isSuccess : isSuccess
+                                }
+                            }
+                        };
+        
+                        sendTo(readyPlayerId, res(true));
+                        readyPlayerIds[readyPlayerId] = data[0].id;
+                    });
+                    
+                    break;
+                case 6:
+                    //find records
+                    console.log("type 6 (find records)");
+
+                    db.select_record(connection, readyPlayerIds[readyPlayerId], (err, data) => {
+                        if (err != null) {
+                            sendTo(readyPlayerId, err(err));
+                            console.log();
+                            console.log("Send to client" + clientId);
+                            console.log(res);
+                            client.write(JSON.stringify(err(err)));
+                            return;
+                        }
+
+                        var res  = (records) => { 
+                            return {
+                                message: {
+                                    type: 6,
+                                    records : records
+                                }
+                            }
+                        };
+        
+                        console.log();
+                        console.log("Send to client" + clientId);
+                        console.log(res);
+                        client.write(JSON.stringify(res(data)));
+                    });
+                    
+                    break;
+                default:
+                    console.log("invalid message type");
+            }
+        } catch (e) {
+        console.log(`error : ${e.name}: ${e.message}`);
         }
     });
 
@@ -272,13 +312,11 @@ let tServer = net.createServer(function(client) {
     client.on('end', function() {
 
         console.log("end connection : "+client.remotePort);
-        console.log(client.remoteAddress + ' Client disconnected');
-        let idx = clients.indexOf(clients.name);
-        clients.splice(idx,1);
-        console.log(clients);
+        console.log(client.remoteAddress + ' Client disconnected, client Id : ' + clientId);
 
-        if(clients.length == 0) {
-            readyPlayer = 0;
+        if (clientId == 0 || clientId == 1){
+            clients.splice(clientId,1);
+            console.log(clients);
             gameActive = false;
         }
     });

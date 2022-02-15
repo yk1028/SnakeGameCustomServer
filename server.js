@@ -14,6 +14,16 @@ let gameActive = false;
 let readyPlayerCount = 0;
 let readyPlayers = [];
 let readyPlayerIds = {};
+let readyUserIds = {};
+
+var error  = (err) => { 
+    return {
+        message: {
+            type: 6,
+            error : err
+        }
+    }
+};
 
 let sendStartMessage = (clientId, canStart) => {
     var res = {
@@ -25,10 +35,6 @@ let sendStartMessage = (clientId, canStart) => {
         }
     };
 
-    sendTo(clientId, res);
-}
-
-let sendTo = (clientId, res) => {
     console.log();
     console.log("Send to client" + clientId);
     console.log(res);
@@ -111,6 +117,7 @@ let tServer = net.createServer(function(client) {
                     );
 
                     readyPlayerId = readyPlayerCount;
+                    readyPlayerIds[readyPlayerId] = readyUserIds[client.remotePort];
                     readyPlayerCount++;
 
                     let canStart = readyPlayerCount == 2
@@ -190,6 +197,9 @@ let tServer = net.createServer(function(client) {
 
                     sendToBoth(readyPlayerId, res(message.win), res(!message.win));
 
+                    console.log(readyPlayerId);
+                    console.log(readyPlayerIds);
+
                     db.insert_record(connection, readyPlayerIds[readyPlayerId], message.win);
                     db.insert_record(connection, readyPlayerIds[1 - readyPlayerId], !message.win);
                     
@@ -212,37 +222,28 @@ let tServer = net.createServer(function(client) {
                         }
                     };
 
-                    var error  = (err) => { 
-                        return {
-                            message: {
-                                type: 6,
-                                error : err
-                            }
-                        }
-                    };
-
                     db.select_user(connection, message.username, 
                         (err, data) => {
                             if (err != null) {
                                 
                                 console.log();
                                 console.log("Send to client" + clientId);
-                                console.log(res);
-                                client.write(JSON.stringify(err));
+                                console.log(error(err));
+                                client.write(JSON.stringify(error(err)));
                                 return;
                             }
 
                             if (data.length == 0){
                                 console.log();
                                 console.log("Send to client" + clientId);
-                                console.log(res);
+                                console.log(res(false));
                                 client.write(JSON.stringify(res(false)));
                             } else {
                                 console.log();
                                 console.log("Send to client" + clientId);
-                                console.log(res);
+                                console.log(res(true));
                                 client.write(JSON.stringify(res(true)));
-                                readyPlayerIds[readyPlayerId] = data[0].id;
+                                readyUserIds[client.remotePort] = data[0].id;
                             }
                         });
                     break;
@@ -252,7 +253,10 @@ let tServer = net.createServer(function(client) {
 
                     db.insert_user(connection, message.username, (err, data) => {
                         if (err != null) {
-                            sendTo(readyPlayerId, err(err));
+                            console.log();
+                            console.log("Send to client" + clientId);
+                            console.log(error(err));
+                            client.write(JSON.stringify(error(err)));
                             return;
                         }
 
@@ -265,8 +269,11 @@ let tServer = net.createServer(function(client) {
                             }
                         };
         
-                        sendTo(readyPlayerId, res(true));
-                        readyPlayerIds[readyPlayerId] = data[0].id;
+                        console.log();
+                        console.log("Send to client" + clientId);
+                        console.log(res(true));
+                        client.write(JSON.stringify(res(true)));
+                        readyUserIds[client.remotePort] = data[0].id;
                     });
                     
                     break;
@@ -274,13 +281,12 @@ let tServer = net.createServer(function(client) {
                     //find records
                     console.log("type 6 (find records)");
 
-                    db.select_record(connection, readyPlayerIds[readyPlayerId], (err, data) => {
+                    db.select_record(connection, readyUserIds[client.remotePort], (err, data) => {
                         if (err != null) {
-                            sendTo(readyPlayerId, err(err));
                             console.log();
                             console.log("Send to client" + clientId);
                             console.log(res);
-                            client.write(JSON.stringify(err(err)));
+                            client.write(JSON.stringify(error(err)));
                             return;
                         }
 
@@ -295,7 +301,7 @@ let tServer = net.createServer(function(client) {
         
                         console.log();
                         console.log("Send to client" + clientId);
-                        console.log(res);
+                        console.log(res(data));
                         client.write(JSON.stringify(res(data)));
                     });
                     
@@ -313,12 +319,8 @@ let tServer = net.createServer(function(client) {
 
         console.log("end connection : "+client.remotePort);
         console.log(client.remoteAddress + ' Client disconnected, client Id : ' + clientId);
-
-        if (clientId == 0 || clientId == 1){
-            clients.splice(clientId,1);
-            console.log(clients);
-            gameActive = false;
-        }
+        clients.splice(clientId,1);
+        console.log(clients);
     });
     
     client.on('error', function(err) {

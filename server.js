@@ -16,15 +16,6 @@ let readyPlayers = [];
 let readyPlayerIds = {};
 let readyUserIds = {};
 
-var error  = (err) => { 
-    return {
-        message: {
-            type: 6,
-            error : err
-        }
-    }
-};
-
 let sendStartMessage = (clientId, canStart) => {
     var res = {
         message: {
@@ -150,7 +141,9 @@ let tServer = net.createServer(function(client) {
                     console.log("Send to client" + (1 - readyPlayerId));
                     console.log(res);
                 
-                    readyPlayers[1 - readyPlayerId].client.write(JSON.stringify(res));
+                    if (readyPlayers[1 - readyPlayerId].client !== undefined) {
+                        readyPlayers[1 - readyPlayerId].client.write(JSON.stringify(res));
+                    }
 
                     break;
                 case 2:
@@ -197,9 +190,6 @@ let tServer = net.createServer(function(client) {
 
                     sendToBoth(readyPlayerId, res(message.win), res(!message.win));
 
-                    console.log(readyPlayerId);
-                    console.log(readyPlayerIds);
-
                     db.insert_record(connection, readyPlayerIds[readyPlayerId], message.win);
                     db.insert_record(connection, readyPlayerIds[1 - readyPlayerId], !message.win);
                     
@@ -225,12 +215,7 @@ let tServer = net.createServer(function(client) {
                     db.select_user(connection, message.username, 
                         (err, data) => {
                             if (err != null) {
-                                
-                                console.log();
-                                console.log("Send to client" + clientId);
-                                console.log(error(err));
-                                client.write(JSON.stringify(error(err)));
-                                return;
+                                throw err;
                             }
 
                             if (data.length == 0){
@@ -253,11 +238,7 @@ let tServer = net.createServer(function(client) {
 
                     db.insert_user(connection, message.username, (err, data) => {
                         if (err != null) {
-                            console.log();
-                            console.log("Send to client" + clientId);
-                            console.log(error(err));
-                            client.write(JSON.stringify(error(err)));
-                            return;
+                            throw err;
                         }
 
                         var res  = (isSuccess) => { 
@@ -283,11 +264,7 @@ let tServer = net.createServer(function(client) {
 
                     db.select_record(connection, readyUserIds[client.remotePort], (err, data) => {
                         if (err != null) {
-                            console.log();
-                            console.log("Send to client" + clientId);
-                            console.log(res);
-                            client.write(JSON.stringify(error(err)));
-                            return;
+                            throw err;
                         }
 
                         var res  = (records) => { 
@@ -310,7 +287,7 @@ let tServer = net.createServer(function(client) {
                     console.log("invalid message type");
             }
         } catch (e) {
-        console.log(`error : ${e.name}: ${e.message}`);
+            console.log(`error : ${e.name}: ${e.message}`);
         }
     });
 

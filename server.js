@@ -16,6 +16,11 @@ let readyPlayers = [];
 let readyPlayerIds = {};
 let readyUserIds = {};
 
+const jsonSeparator = "<EOJ>";
+const convertSendMessage = (message) => {
+    return JSON.stringify(message) + jsonSeparator;
+}
+
 let sendStartMessage = (clientId, canStart) => {
     var res = {
         message: {
@@ -30,7 +35,7 @@ let sendStartMessage = (clientId, canStart) => {
     console.log("Send to client" + clientId);
     console.log(res);
 
-    readyPlayers[clientId].client.write(JSON.stringify(res));
+    readyPlayers[clientId].client.write(convertSendMessage(res));
 }
 
 let sendToBoth = (clientId, res, resOther) => {
@@ -38,13 +43,13 @@ let sendToBoth = (clientId, res, resOther) => {
     console.log("Send to client" + clientId);
     console.log(res);
 
-    readyPlayers[clientId].client.write(JSON.stringify(res));
+    readyPlayers[clientId].client.write(convertSendMessage(res));
 
     console.log();
     console.log("Send to client" + (1 - clientId));
     console.log(resOther);
 
-    readyPlayers[1 - clientId].client.write(JSON.stringify(resOther));
+    readyPlayers[1 - clientId].client.write(convertSendMessage(resOther));
 }
 
 let generateRandom = (bound) => {
@@ -71,7 +76,7 @@ let tServer = net.createServer(function(client) {
     console.log('   client ='+ JSON.stringify(client));
     
     let clientId = clients.length;
-    let readyPlayerId = 0;
+    let readyPlayerId = -1;
 
     clients.push(
         {
@@ -79,19 +84,14 @@ let tServer = net.createServer(function(client) {
             client : client
         }
     );
-    
-    console.log("connection clients list : "+ clients);
 
     client.setEncoding('utf8');
     
     client.on('data', function(data) {
-        if(clients.length == 1) {
-            clientId = 0;
-        }
 
-        console.log();
-        console.log("Receive from client" + clientId);
-        console.log(data);
+        // console.log();
+        // console.log("Receive from client" + clientId);
+        // console.log(data);
         
         try {
             let message = JSON.parse(data);
@@ -111,7 +111,7 @@ let tServer = net.createServer(function(client) {
                     readyPlayerIds[readyPlayerId] = readyUserIds[client.remotePort];
                     readyPlayerCount++;
 
-                    let canStart = readyPlayerCount == 2
+                    let canStart = readyPlayerCount == 2;
 
                     if (canStart) {
                         apple = {
@@ -136,14 +136,12 @@ let tServer = net.createServer(function(client) {
                             snake: message.snake
                         }
                     };
-                
-                    console.log();
-                    console.log("Send to client" + (1 - readyPlayerId));
-                    console.log(res);
-                
-                    if (readyPlayers[1 - readyPlayerId].client !== undefined) {
-                        readyPlayers[1 - readyPlayerId].client.write(JSON.stringify(res));
-                    }
+
+                    // console.log();
+                    // console.log("Send to client" + (1 - readyPlayerId));
+                    // console.log(res);
+
+                    readyPlayers[1 - readyPlayerId].client.write(convertSendMessage(res));
 
                     break;
                 case 2:
@@ -155,7 +153,7 @@ let tServer = net.createServer(function(client) {
                         apple.posX = generateRandom(16);
                         apple.posY = generateRandom(7);
 
-                        var res  = (isMine) => { 
+                        var res = (isMine) => { 
                             return {
                                 message: {
                                     type: 2,
@@ -195,6 +193,7 @@ let tServer = net.createServer(function(client) {
                     
                     readyPlayerCount = 0;
                     readyPlayers = [];
+                    readyPlayerIds = {};
 
                     gameActive = false;
 
@@ -222,12 +221,12 @@ let tServer = net.createServer(function(client) {
                                 console.log();
                                 console.log("Send to client" + clientId);
                                 console.log(res(false));
-                                client.write(JSON.stringify(res(false)));
+                                client.write(convertSendMessage(res(false)));
                             } else {
                                 console.log();
                                 console.log("Send to client" + clientId);
                                 console.log(res(true));
-                                client.write(JSON.stringify(res(true)));
+                                client.write(convertSendMessage(res(true)));
                                 readyUserIds[client.remotePort] = data[0].id;
                             }
                         });
@@ -253,7 +252,8 @@ let tServer = net.createServer(function(client) {
                         console.log();
                         console.log("Send to client" + clientId);
                         console.log(res(true));
-                        client.write(JSON.stringify(res(true)));
+                        
+                        client.write(convertSendMessage(res(true)));
                         readyUserIds[client.remotePort] = data[0].id;
                     });
                     
@@ -279,7 +279,7 @@ let tServer = net.createServer(function(client) {
                         console.log();
                         console.log("Send to client" + clientId);
                         console.log(res(data));
-                        client.write(JSON.stringify(res(data)));
+                        client.write(convertSendMessage(res(data)));
                     });
                     
                     break;
@@ -296,12 +296,47 @@ let tServer = net.createServer(function(client) {
 
         console.log("end connection : "+client.remotePort);
         console.log(client.remoteAddress + ' Client disconnected, client Id : ' + clientId);
-        clients.splice(clientId,1);
+
+        if (readyPlayerId != -1 && readyPlayerCount != 0) {
+            if (gameActive) {
+                var res  = (win) => { 
+                    return {
+                        message: {
+                            type: 3,
+                            win : win
+                        }
+                    }
+                };
+        
+                readyPlayers[1- readyPlayerId].client.write(convertSendMessage(res(true)));
+        
+                db.insert_record(connection, readyPlayerIds[readyPlayerId], false);
+                db.insert_record(connection, readyPlayerIds[1 - readyPlayerId], true);
+                
+                readyPlayerCount = 0;
+                readyPlayers = [];
+                readyPlayerIds = {};
+        
+                gameActive = false;
+            } else {
+                readyPlayerCount = 0;
+                readyPlayers = [];
+                readyPlayerIds = {};
+            }
+        }
+        
+        const idx = clients.findIndex((item) => item.name == client.remotePort);
+        if (idx > -1) clients.splice(idx, 1);
+
         console.log(clients);
     });
     
     client.on('error', function(err) {
         console.log('Socket Error: ', JSON.stringify(err));
+
+        if (!gameActive) {
+            return;
+        }
     });
     
     client.on('timeout', function() {

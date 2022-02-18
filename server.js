@@ -88,10 +88,6 @@ let tServer = net.createServer(function(client) {
     client.setEncoding('utf8');
     
     client.on('data', function(data) {
-
-        // console.log();
-        // console.log("Receive from client" + clientId);
-        // console.log(data);
         
         try {
             let message = JSON.parse(data);
@@ -136,10 +132,6 @@ let tServer = net.createServer(function(client) {
                             snake: message.snake
                         }
                     };
-
-                    // console.log();
-                    // console.log("Send to client" + (1 - readyPlayerId));
-                    // console.log(res);
 
                     readyPlayers[1 - readyPlayerId].client.write(convertSendMessage(res));
 
